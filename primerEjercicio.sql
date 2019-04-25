@@ -1,3 +1,4 @@
+/*Primera consulta de la práctica, punto 2.a*/
 USE segundapracticabda;
 SET GLOBAL query_cache_type = 0;
 SELECT firstName,lastName,edad,count(*) as partidosJugados
