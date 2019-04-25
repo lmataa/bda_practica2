@@ -1,14 +1,15 @@
 ---
 title: "Memoria diseño modelo relacional"
-subtitle: "Bases de Datos Avanzadas - UPM"
 author: [Luis Mata bm0613, Javier Morate bm0620]
 date: "05-04-2019"
-titlepage: True
-toc: "true"
+subtitle: "Segunda Práctica de Bases de Datos Avanzadas - UPM"
+logo: logo.png
+titlepage: "True"
+toc: "True"
+toc-own-page: "True"
 ...
 
 # Memoria de trabajo sobre técnicas de aceleración de consultas
-
 
 
 ## 1. Introducción y forma de trabajo
@@ -23,6 +24,20 @@ toc: "true"
 ### 2. Estudio de paneles de consulta e índices.
 
 #### a. Crear una consulta SQL que permita obtener el número de partidos jugados por cada jugador para aquellos jugadores de nacionalidad estadounidense (USA) o canadiense (CAN) que hayan jugado más partidos que la media del número de partidos jugados por todos los jugadores. La consulta devolverá el nombre y apellido del jugador y su edad actual, así como el número de partidos jugados, pero el resultado estará ordenado descendentemente por edad e a igual edad por apellido seguido de nombre pero ascendentemente.
+
+```SQL
+USE segundapracticabda;
+SET GLOBAL query_cache_type = 0;
+SELECT firstName,lastName,edad,count(*) AS partidosJugados
+FROM player p INNER JOIN player_stats ps ON p.player_id = ps.player_id
+WHERE nationality='CAN' OR nationality='USA'
+GROUP BY firstName,lastName,edad
+HAVING partidosJugados >= ALL(select avg(partidosJugados)
+	FROM (SELECT player_id,count(*) as partidosJugados
+		FROM player_stats
+		GROUP BY by player_id) as td)
+ORDER BY edad DESC, lastName ASC, firstName ASC
+```
 
 #### b. Estudiar el plan de consulta, tomando nota de los costes del mismo y comentarlo.
 
