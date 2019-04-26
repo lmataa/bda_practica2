@@ -15,26 +15,42 @@ listings-no-page-break: "True"
 
 ## 1. Introducción y forma de trabajo
 
+Para esta práctica hemos usado como equipo un portátil DELL XPS 15 9550 con las siguientes especificaciones:
+
+- CPU: Intel i7-6700HQ (8) @ 3.500GHz 
+- Memory: 15882MiB 
+- OS: openSUSE Leap 15.0 x86_64
+- Kernel: 4.12.14-lp150.12.48-default
+
+Para realizar la práctica, además hemos usado git como sistema de control de versiones, utilizando como servicio Github en el siguiente enlace se encuntra el repositorio utilizado:
+
+- [Enlace al repositorio de Github](https://github.com/lmataa/bda_practica2)
+
+Como sistema de gestión de base de datos hemos usado MariaDB salvando las explicaciones de plan de consulta que las hemos realizado en los laboratorios de la escuela.
+
 ## 2. Puntos pedidos
 
 ### 1. Se realizará la importación del esquema y datos de las cuatro tablas
 
 > Mediante la opción “Data Import” del menú Server de MySqlWorkbench con el fichero “dumpBDAprac2.sql” disponible en el Moodle de la asignatura.
 
+Realizamos la importación del esquema sin mayor complicaciones, nombramos a la base de datos utilizada *"segundapracticabda"*.
 
 ### 2. Estudio de paneles de consulta e índices.
 
 #### a. Crear una consulta SQL que permita obtener el número de partidos jugados por cada jugador para aquellos jugadores de nacionalidad estadounidense (USA) o canadiense (CAN) que hayan jugado más partidos que la media del número de partidos jugados por todos los jugadores. La consulta devolverá el nombre y apellido del jugador y su edad actual, así como el número de partidos jugados, pero el resultado estará ordenado descendentemente por edad e a igual edad por apellido seguido de nombre pero ascendentemente.
 
+
+
 ```SQL
 USE segundapracticabda;
 SET GLOBAL query_cache_type = 0;
-SELECT firstName,lastName,edad,count(*) AS partidosJugados
+SELECT firstName, lastName, edad, COUNT(*) AS partidosJugados
 FROM player p INNER JOIN player_stats ps ON p.player_id = ps.player_id
 WHERE nationality='CAN' OR nationality='USA'
-GROUP BY firstName,lastName,edad
+GROUP BY firstName, lastName, edad
 HAVING partidosJugados >= ALL(select avg(partidosJugados)
-	FROM (SELECT player_id,count(*) as partidosJugados
+	FROM (SELECT player_id, COUNT(*) as partidosJugados
 		FROM player_stats
 		GROUP BY by player_id) as td)
 ORDER BY edad DESC, lastName ASC, firstName ASC
@@ -43,16 +59,20 @@ ORDER BY edad DESC, lastName ASC, firstName ASC
 #### b. Estudiar el plan de consulta, tomando nota de los costes del mismo y comentarlo.
 
 ![Plan de consulta sin índices ni claves]()
+    
 ![Coste del plan de consulta sin índices ni claves]()
+    
 
 #### c. Crear las claves principales y foráneas mediante los ficheros script CrearClavesPrimarias.sql y CrearClavesForeaneas.sql, y nuevamente estudiar el pland e consulta, comparando costes con el punto anterior.
 
 ![Plan de consulta con claves]()
+    
 ![Coste del plan de consulta con claves]()
+   
 
 #### d. Crear los índices que se estimen necesarios para mejorar la consulta.
 
-Creamos un índice para nacionaldad, ya que ésta se situa en la cláusula WHERE, por lo que la consulta es susceptible de mejorar con un índice, además se trata de una cadena de 3 caracteres por lo que no resultaría costoso.
+Creamos un índice para nacionalidad, ya que ésta se situa en la cláusula WHERE, por lo que la consulta es susceptible de mejorar con un índice, además se trata de una cadena de 3 caracteres por lo que no resultaría costoso.
 
 El otro índice que creamos va para la triada firstName, lastName y edad situada en la cláusula GROUP BY, por lo que también es susceptible de mejora.
 
@@ -67,8 +87,9 @@ ON player(firstName, lastName, edad);
 #### e. Estudiar el plan de consulta con los nuevos índices y comparar resultados con los obtenidos en los puntos anteriores.
 
 ![Plan de consulta con índices y claves]()
-
+    
 ![Coste del plan de consulta con índices y claves]()
+    
 
 ### 3. Optimización de consultas y estudio de planes de consulta
 
@@ -83,6 +104,8 @@ ON player;
 ```
 
 #### b. Definir en SQL al menos dos sentencias diferentes que permitan obtener los datos de los equipos que hayan jugado más partidos en los últimos seis meses del año 2017, devolviendo los atributos: identificador del equipo, nombre del equipo, número de partidos jugados, total de tiros (tshots) realizados en esos seis meses, media de goles del equipo por partido.
+
+La primera consulta que realizamos utiliza los valores de fechas absolutos y la segunda utiliza valores de fecha aplicando la función YEAR y MONTH.
 
 ```SQL
 -- Primera consulta
@@ -224,23 +247,92 @@ GROUP BY firstName, lastName, edad, goles, media_goles;
 
 #### c. Aplicar la técnica de desnormalización que se considere más adecuada para acelerar la consulta del apartado 5.b, creando los scripts sql necesarios para modificar el esquema de la base de datos.
 
+Para mejorar el coste de la consulta anterior vamos a aplicar la ténica de desnormalización en la tabla de jugadores. Para ello vamos a añadir a esta tabla las columnas de estadísticas de jugador correspondientes a asistencias, ya que goles y media_goles ya pertenecen a la tabla de jugador. Si no hubiesen pertenecido goles y media_goles a esta tabla, entonces hubiésemos aplicado desnormalización también con esas columnas.
 
+Como alternativa también podríamos haber incluido la media de asistencias en la tabla de jugadores pero resultaría costoso para actualizaciones, por lo que dejamos que la carga de trabajo de esta desnormalización recaiga en la consulta y no en las actualizaciones.
 
+```SQL
+USE segundapracticabda;
+SET GLOBAL query_cache_type = 0;
+
+ALTER TABLE player
+ADD COLUMN asistencias INT;
+```
 
 #### d. Crear un script que actualice los datos implicados en la desnormalización.
+```SQL
+USE segundapracticabda;
+SET GLOBAL query_cache_type = 0;
+UPDATE player
+SET asistencias = (SELECT assists FROM player_stats);
+```
 
 #### e. Crear los triggers necesarios para mantener actualizados los datos implicados en la desnormalización.
 
+```SQL
+
+```
+
 #### f. Realizar la consulta 5.b sobre la base de datos desnormalizada. Estudiar coste y plan comparándolo con el obtenido en el apartado 5b.
 
+![Coste de la consulta con la base de datos desnormalizada]()
+    
+![Plan de consulta con la base de datos desnormalizada]()
+    
 ### 6. Particionamiento.
 
 #### a. Eliminar las claves foráneas con el script proporcionado “EliminarClavesForaneas.sql”.
 
+En este apartado ejecutamos el script pertinente, sin más comentarios.
+
 #### b. Crear una consulta sql que obtenga, para cada jugador, su apellido, nombre, el número de partidos jugados y el número de jugadas realizadas por el jugador durante el año 2017. Estudiar coste y plan.
+
+```SQL
+
+```
 
 #### c. Razonar justificadamente (sin necesidad de implementarla realmente en SQL) una variante de la estructura existente realizando un particionamiento horizontal de los datos con el objeto de mejorar el tipo de consultas (con diferentes años) que se ha realizado en el apartado 6.a
 
+Como hemos visto en las clases de laboratorio de la asignatura, un particionamiento horizontal puede ser muy útil si solo se van a acceder a datos en un determinado rango. Puede suponer pasar de hacer consultas de varios millones de filas a consultas de medio millón o incluso resultar útil para ciertas proyecciones.
+
+Por lo siguiente, nuestra propuesta consiste en hacer un particionamiento horizontal por años donde tendríamos tantas tablas como años para nuestro esquema. Esto supondría una mejora sustancial ya que, especialmente en un sistema de gestión de base de datos de un club deportivo, interesaría especialmente hacer consultas frecuentes (o inserciones y actualizaciones) en la temporada actual.
+
 #### d. Implementar en MySQL un particionamiento horizontal (mediante la sentencia ALTER TABLE …. PARTITION ….) que separe los datos de los partidos jugados en el año 2017 del resto. Realizar de nuevo la consulta 6.a y estudiar coste y plan comparándolo con lo obtenido en el apartado 6.a. Si se necesita modificar la clave primaria, hágase mediante la sentencia ALTER TABLE.
 
+Sigue la lógica anteriormente comentada, en este caso vamos a tener una tabla con los datos correspondientes a un solo año y por otro lado una tabla con el resto de años.
+
+Resulta que no podemos realizar particionamientos con MySQL en tablas que tengan claves foráneas, por lo que hay que ejecutar el script del punto 6.a (requisito ya cumplido) además tampoco podemos usar claves primarias. Eliminar esta clave sería una mala solución por lo que utilizamos una superclave conformada por game_id y date_time. De forma que podamos acceder a todas las tablas particionadas con clave.
+
+```SQL
+-- Particionamiento horizontal
+ALTER TABLE game DROP PRIMARY KEY;
+
+ALTER TABLE game ADD PRIMARY KEY(game_id, date_time);
+
+ALTER TABLE game 
+PARTITION BY LIST (YEAR(date_time)) (
+	PARTITION part_2017 VALUES IN (2017),
+    PARTITION part_resto VALUES IN (2013, 2014, 2015, 2016, 2018)
+);
+```
+
+Realizamos ahora de nuevo la consulta 6.b, especificando su partición, y observamos las diferencias.
+```SQL
+-- Consulta en partición
+
+```
+
+![Coste con particionamiento]()
+
+![Plan de ejecución con particionamiento]()
+
+
 ## 3. Conclusiones
+
+La realización de la práctica nos ha puesto al día con lo explicado en la parte teórica de la asignatura correspondiente a índices y optimización de consultas en bases de datos relacionales. 
+
+Ha sido especialmente interesante el disponer de métricas de coste para las consultas, como prueba empírica de que se están realizando optimizaciones reales.
+
+Aunque no hayamos usado los planes de consulta gráficos de MySQL, también hemos acabado enfrentándonos a la interpretación tabular de los planes de consulta de MariaDB. Sin embargo y por el bien de nuestra mejor comprensión, también hemos ejecutado los scripts en los equipos de la escuela y hemos obtenido el plan de consultas de ahí para un análisis más gráfico que hemos reflejado en esta memoria.
+
+
