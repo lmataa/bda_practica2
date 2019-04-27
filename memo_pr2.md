@@ -1,5 +1,5 @@
 ---
-title: "Memoria diseño modelo relacional"
+title: "Técnicas de aceleración de consultas"
 author: [Luis Mata bm0613, Javier Morate bm0620]
 date: "05-04-2019"
 subtitle: "Segunda Práctica de Bases de Datos Avanzadas - UPM"
@@ -26,7 +26,7 @@ Para realizar la práctica, además hemos usado git como sistema de control de v
 
 - [Enlace al repositorio de Github](https://github.com/lmataa/bda_practica2)
 
-Como sistema de gestión de base de datos hemos usado MariaDB salvando las explicaciones de plan de consulta que las hemos realizado en los laboratorios de la escuela.
+Como sistema de gestión de base de datos hemos usado MariaDB salvando las explicaciones de plan de consulta que las hemos realizado con MySQL (explicación en el apartado de conclusiones).
 
 ## 2. Puntos pedidos
 
@@ -74,7 +74,7 @@ Mostramos ahora el plan de consulta con las claves creadas y su coste asociado.
 
 ![Plan de consulta con claves](capturas/2_c.png)
  
-Realiza el mismo escaneo para la tabla de jugador (p) pero para la tabla de estadísticas (ps) el coste se ve reducido debido a la búsqueda de claves no únicas. Esto significa que ha usdao el índice player_id para buscar en esta tabla y esta vez las tablas escaneadas de esta parte son 142, las producidas por el join ahora son 60720 . Posteriormente realiza el group by y order by como en la consulta anterior solo que en este caso el coste final de la consulta estimado es de 6436.73. Por lo que es mucho más optimo realizar esta consulta con claves primarias y foráneas.  
+Realiza el mismo escaneo para la tabla de jugador (p) pero para la tabla de estadísticas (ps) el coste se ve reducido debido a la búsqueda de claves no únicas. Esto significa que ha usdao el índice player_id para buscar en esta tabla y esta vez las tablas escaneadas de esta parte son 142, las producidas por el join ahora son 60720 . Posteriormente realiza el group by y order by como en la consulta anterior solo que en este caso el coste final de la consulta estimado es de 6436.73. Por lo que es mucho más óptimo realizar esta consulta con claves primarias y foráneas.  
 
 #### d. Crear los índices que se estimen necesarios para mejorar la consulta.
 
@@ -108,7 +108,7 @@ Como podemos observar en la imagen inferior, sigue sin tener en cuenta el indx_n
 
 ![Plan de consulta con ambos índices y claves](capturas/2_e_3.png)
 
-Por lo tanto la acción más optima en este caso para el planificador es utilizar exclusivamente el indx_nation para la nacionalidad del jugador.
+Por lo tanto la acción más optima en este caso para el planificador es utilizar exclusivamente el indx_nation para la nacionalidad del jugador en esta consulta.
 
 ### 3. Optimización de consultas y estudio de planes de consulta
 
@@ -208,7 +208,7 @@ Como podemos observar se obtiene el mismo coste en la tabla game que al usar sol
     
 - En cuanto a la segunda consulta propuesta:
 
-Como vemos, utiliza el índice en la tabla equipo (t) pero no reduce el coste final del query_block con respecto a la consulta sin índices.
+Como vemos, utiliza el índice en la tabla equipo (t) pero no reduce el coste final del query_block con respecto a la consulta sin índices. Sin embargo el peso de la consulta recae en examinar la tabla de equipo y quita peso al GROUP BY. Por eso el código de colores pinta ahora la cláusula GROUP BY en verde claro y la tabla team en rojo.
 
 ![Coste de la consulta B con índice indx_team_id_name](capturas/3_c_4.png)
  
@@ -417,7 +417,7 @@ AND YEAR(g.date_time) =2017
 GROUP BY p.player_id;
 ```
 
-Primero realiza un escaneo completo de la tabla game (g) a la cual hace join con player_stats (ps) y al resultado se le hace join con player donde se usan como índice las claves primarias. Por último se le aplica el group by y el resultado del query_block es 173779.07.
+Primero realiza un escaneo completo de la tabla game (g) a la cual hace join con player_stats (ps). Al resultado se le hace join con player (p) donde se usan como índice las claves primarias (al igual que en player_stats). Por último se le aplica el group by y el resultado del query_block es 173779.07.
 
 ![Coste de la consulta 6.b](capturas/6_b.png)
 
@@ -473,6 +473,7 @@ La realización de la práctica nos ha puesto al día con lo explicado en la par
 
 Ha sido especialmente interesante el disponer de métricas de coste para las consultas, como prueba empírica de que se están realizando optimizaciones reales.
 
-Aunque no hayamos usado los planes de consulta gráficos de MySQL, también hemos acabado enfrentándonos a la interpretación tabular de los planes de consulta de MariaDB. Sin embargo y por el bien de nuestra mejor comprensión, también hemos ejecutado los scripts en los equipos de la escuela y hemos obtenido el plan de consultas de ahí para un análisis más gráfico que hemos reflejado en esta memoria.
+Como en un principio no hemos usado los planes de consulta gráficos de MySQL al usar MariaDB, hemos acabado enfrentándonos a la interpretación tabular de los planes de consulta. Sin embargo y por el bien de nuestra mejor comprensión, repetimos nuestra práctica en el mismo equipo utilizando MySQL para obtener el plan de consultas gráfico el cual hemos acabado reflejado en esta memoria.
+
 
 
