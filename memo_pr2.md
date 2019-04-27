@@ -40,8 +40,6 @@ Realizamos la importación del esquema sin mayor complicaciones, nombramos a la 
 
 #### a. Crear una consulta SQL que permita obtener el número de partidos jugados por cada jugador para aquellos jugadores de nacionalidad estadounidense (USA) o canadiense (CAN) que hayan jugado más partidos que la media del número de partidos jugados por todos los jugadores. La consulta devolverá el nombre y apellido del jugador y su edad actual, así como el número de partidos jugados, pero el resultado estará ordenado descendentemente por edad e a igual edad por apellido seguido de nombre pero ascendentemente.
 
-
-
 ```SQL
 USE segundapracticabda;
 SET GLOBAL query_cache_type = 0;
@@ -58,17 +56,25 @@ ORDER BY edad DESC, lastName ASC, firstName ASC
 
 #### b. Estudiar el plan de consulta, tomando nota de los costes del mismo y comentarlo.
 
-![Plan de consulta sin índices ni claves]()
-    
-![Coste del plan de consulta sin índices ni claves]()
-    
+En esta consulta, el planificador primero escanea las tablas completas de jugador (p) y estadísticas de jugador (ps) que corresponden cada una a 2246 filas y 267399 filas respectivamente. Posteriormente realiza el join de ambas tablas resultando en aproximadamente 11 millones de filas. 
+
+Por último y en secuencia realiza el group by seguido de un order by para resultar en el query block con un coste de 11412412.76.
+
+Cabe destacar que el coste del plan de ejecución no tiene unidades y es una representación simbólica de coste.
+
+![Plan de consulta sin índices ni claves](capturas/2_b.png)
+
+
 
 #### c. Crear las claves principales y foráneas mediante los ficheros script CrearClavesPrimarias.sql y CrearClavesForeaneas.sql, y nuevamente estudiar el pland e consulta, comparando costes con el punto anterior.
 
-![Plan de consulta con claves]()
-    
-![Coste del plan de consulta con claves]()
-   
+Primero creamos claves primarias y a continuación las foráneas, ya que el orden inverso no puede realizarse.
+
+Mostramos ahora el plan de consulta con las claves creadas y su coste asociado.
+
+![Plan de consulta con claves](capturas/2_c.png)
+ 
+Realiza el mismo escaneo para la tabla de jugador (p) pero para la tabla de estadísticas (ps) el coste se ve reducido debido a la búsqueda de claves no únicas. Esto significa que ha usdao el índice player_id para buscar en esta tabla y esta vez las tablas escaneadas de esta parte son 142, las producidas por el join ahora son 60720 . Posteriormente realiza el group by y order by como en la consulta anterior solo que en este caso el coste final de la consulta estimado es de 6436.73. Por lo que es mucho más optimo realizar esta consulta con claves primarias y foráneas.  
 
 #### d. Crear los índices que se estimen necesarios para mejorar la consulta.
 
@@ -86,10 +92,23 @@ ON player(firstName, lastName, edad);
 
 #### e. Estudiar el plan de consulta con los nuevos índices y comparar resultados con los obtenidos en los puntos anteriores.
 
-![Plan de consulta con índices y claves]()
-    
-![Coste del plan de consulta con índices y claves]()
-    
+En este primer intento usamos exclusivamente el índice para la nacionalidad del jugador que es indx_nation. Se realiza el mismo plan de ejecución que en el apartado anterior pero con un coste inferior de 24691.02. Por lo que este índice es considerado por el planificador y es más optimo que no usarlo. 
+
+![Plan de consulta con indx_nation y claves](capturas/2_e_1.png)
+ 
+Ahora borramos el índice *indx_nation* y repetimos la consulta utilizando exclusivamente el índice indx_name_age.
+
+Debido a que no tiene en consideración este índice, el resultado es el mismo que al no usar índices (ver apartado 2.c).
+
+![Plan de consulta con indx_name_age y claves](capturas/2_e_2.png)
+
+Vamos a realizar un último experimento en este apartado probando ambos índices por si pudiese mejorar el coste del planificador.
+
+Como podemos observar en la imagen inferior, sigue sin tener en cuenta el indx_name_age y solo utiliza el indx_nation por lo que el resultado es el mismo que si solo utilizamos indx_nation.
+
+![Plan de consulta con ambos índices y claves](capturas/2_e_3.png)
+
+Por lo tanto la acción más optima en este caso para el planificador es utilizar exclusivamente el indx_nation para la nacionalidad del jugador.
 
 ### 3. Optimización de consultas y estudio de planes de consulta
 
@@ -122,6 +141,11 @@ HAVING numPartidos >= ALL(SELECT count(*) AS numPartidos
 	WHERE date_time BETWEEN '2017-07-1' AND '2017-12-31'
 	GROUP BY t.team_id);
 ```
+
+El planificador utiliza las claves primarias para las tablas de team_stats (ts) y team (t) y realiza un escaneo completo de la tabla game (g). Posteriormente realiza en join de game con team_stats y el resultado con team. Por último le aplica la cláusula GROUP BY y resulta en un coste total de 4338.72 para esta consulta.
+
+![Plan y coste de la primera consulta](capturas/3_b_A.png)
+
 ```SQL
 -- Segunda consulta
 USE segundapracticabda;
@@ -137,6 +161,11 @@ HAVING numPartidos >= ALL(SELECT count(*) AS numPartidos
 	WHERE YEAR(date_time)=2017 AND MONTH(date_time)>=7
 	GROUP BY t.team_id);
 ```
+
+En este caso el planificador realiza ahora un escaneo completo de la tabla de equipo (t), y utiliza las claves como índice en las otras tablas. Además la tabla de partidos (g) se ve afectada en coste por las funciones utilizadas. En este caso el join se realiza primero entre team y team_stats y el resultado con la tabla de partidos (g). Posteriormente realiza el GROUP BY y el query_block resultante tiene como coste 9353.92, lo cual es más costoso que la consulta anterior.
+
+![Plan y coste de la primera consulta](capturas/3_b_B.png)
+
 
 #### c. Crear los índices que permitan optimizar el coste de las consultas, analizando plan de consulta y coste para cada uno de los casos, justificando que solución es la más óptima.
 
@@ -159,24 +188,31 @@ ON team(team_id, teamName);
 
 - Los resultados obtenidos en este apartado para las consultas realizadas indican una mejora sustancial en cuanto al uso de índices. Veamos:
 
-![Coste consulta A sin índices](capturas/3_b_A_cost.png)
-    
-![Coste consulta A con índices](capturas/3_b_A_cost_windex.png)
-    
-![Coste consulta B sin índices](capturas/3_b_B_cost.png)
-    
-![Coste consulta B con índices](capturas/3_b_B_cost_windex.png)
-    
-- En cuanto a los planes de ejecución:
+- En cuanto a la primera consulta propuesta:
 
-![Plan de ejecución A sin índices](capturas/3_c_A_ex.png)
+Empezamos utilizando solo el índice indx_dtime, podemos apreciar que efectivamente se usa el índice en la tabla de partidos (g) y se recude bastante el coste tanto del escaneo de esta tabla como de la consulta global que pasa a ser de 1846.02.
+
+![Coste consulta A con índice indx_dtime](capturas/3_c_1.png)
     
-![Plan de ejecución A con índices](capturas/3_c_A_ex_windex.png)
+Ahora eliminamos el índice de indx_dtime y probamos a realizar la misma consulta con el índice indx_team_id_name.
+
+No se produce ningún cambio respecto al plan sin la creación de este índice.
+
+![Coste consulta A con índice indx_team_id_name](capturas/3_c_2.png)
+
+Probamos ahora a usar los dos índices en la primera consulta.
+
+Como podemos observar se obtiene el mismo coste en la tabla game que al usar solo indx_dtime pero a la hora del join con team_stats el coste aumenta debido al uso del índice indx_team_id_name. El coste resultante es de 2626.96, que es superior al de la consulta A con el índice indx_dtime. Por lo tanto para esta consulta lo más óptimo considerado es usar exclusivamente el índice indx_dtime.
     
-![Plan de ejecución B sin índices](capturas/3_c_B_ex.png)
+![Coste consulta A con ambos índices](capturas/3_c_3.png)
     
-![Plan de ejecución B con índices](capturas/3_c_B_ex_windex.png)
-    
+- En cuanto a la segunda consulta propuesta:
+
+Como vemos, utiliza el índice en la tabla equipo (t) pero no reduce el coste final del query_block con respecto a la consulta sin índices.
+
+![Coste de la consulta B con índice indx_team_id_name](capturas/3_c_4.png)
+ 
+Como conclusión de este ejercicio, para realizar la consulta pedida de forma óptima, lo ideal es usar la primera consulta propuesta con el índice indx_dtime.
 
 ### 4. Estudio de índices en actualizaciones.
 
@@ -196,14 +232,17 @@ ON team;
 USE segundapracticabda;
 SET GLOBAL query_cache_type = 0;
 
+-- Creación de la columna en la tabla stats
 ALTER TABLE player_stats
 ADD COLUMN puntuacion INT;
 
+-- Update de la columna puntuación usando la función SUM
 UPDATE player_stats
-SET puntuacion = (select SUM(assists+goals+shots));
+SET puntuacion = (SELECT SUM(assists+goals+shots)
+				  GROUP BY game_id, player_id);
 ```
 
-![Coste de la actualización](capturas/4_b_cost.png)
+El coste de la actualización de este apartado es de 12.109 segundos.
 
 #### c. Volver a actualizar a null el atributo puntuación en todas las filas.
 
@@ -214,6 +253,8 @@ UPDATE player_stats
 SET puntuacion = null;
 ```
 
+El coste de la actualización a null es 9.860 segundos.
+
 #### d. Por preverse un tipo de consultas con ordenación muy complicada, se desea crear un índice en la tabla "player_stats" por los atributos goals, shots, game_id, assists, player_id y puntuación, en ese orden. Crear el índice.
 
 ```SQL
@@ -223,7 +264,7 @@ ON player_stats(goals, shots, game_id, assists, player_id, puntuacion);
 
 #### e. Volver a ejecutar la sentencia que establece los valores del atributo puntuación a la suma comentada anteriormente. Comprobar tiempo de ejecución y compararlo razonadamente con el contenido del punto 4.b.
 
-![Coste de actualización con índices](capturas/4_e_cost.png)
+Volvemos a ejecutar la actualización del apartado 4.b, pero en este caso el tiempo de ejecución pasa a ser 18.218 segundos, por lo tanto no es aconsejable el uso de este índice.
 
 ### 5. Desnormalización
 
@@ -245,40 +286,110 @@ WHERE edad BETWEEN '25' AND '33'
 GROUP BY firstName, lastName, edad, goles, media_goles;
 ```
 
+El planificador en este caso analiza completamente la tabla player (p) sin índices y la tabla player_stats (ps) con indices de clave. Posteriormente realiza el join de ambas resultando en 45278 filas y por último, pasa por la tabla temporal para el GROUP BY y el coste del query_block resultante es 37958.45.
+
+![Plan de ejecución y costes de la consulta 5.b](capturas/5_b.png)
+
 #### c. Aplicar la técnica de desnormalización que se considere más adecuada para acelerar la consulta del apartado 5.b, creando los scripts sql necesarios para modificar el esquema de la base de datos.
 
-Para mejorar el coste de la consulta anterior vamos a aplicar la ténica de desnormalización en la tabla de jugadores. Para ello vamos a añadir a esta tabla las columnas de estadísticas de jugador correspondientes a asistencias, ya que goles y media_goles ya pertenecen a la tabla de jugador. Si no hubiesen pertenecido goles y media_goles a esta tabla, entonces hubiésemos aplicado desnormalización también con esas columnas.
+Para mejorar el coste de la consulta anterior vamos a aplicar la ténica de desnormalización en la tabla de jugadores. Para ello vamos a añadir a esta tabla las columnas de estadísticas de jugador correspondientes a asistencias y media de asistencias, ya que goles y media_goles ya pertenecen a la tabla de jugador. Si no hubiesen pertenecido goles y media_goles a esta tabla, entonces hubiésemos aplicado desnormalización también con esas columnas.
 
-Como alternativa también podríamos haber incluido la media de asistencias en la tabla de jugadores pero resultaría costoso para actualizaciones, por lo que dejamos que la carga de trabajo de esta desnormalización recaiga en la consulta y no en las actualizaciones.
 
 ```SQL
 USE segundapracticabda;
 SET GLOBAL query_cache_type = 0;
 
 ALTER TABLE player
-ADD COLUMN asistencias INT;
+ADD COLUMN asistencias INT,
+ADD COLUMN media_asistencias FLOAT;
 ```
 
 #### d. Crear un script que actualice los datos implicados en la desnormalización.
 ```SQL
 USE segundapracticabda;
 SET GLOBAL query_cache_type = 0;
-UPDATE player
-SET asistencias = (SELECT assists FROM player_stats);
+UPDATE player p 
+SET asistencias = (
+	SELECT SUM(assists) 
+    FROM player_stats ps 
+    WHERE p.player_id = ps.player_id 
+    GROUP BY ps.player_id),
+	media_asistencias = (
+	SELECT AVG(assists)
+        FROM player_stats ps 
+		WHERE p.player_id = ps.player_id 
+		GROUP BY ps.player_id);
+	
 ```
 
 #### e. Crear los triggers necesarios para mantener actualizados los datos implicados en la desnormalización.
 
 ```SQL
+USE segundapracticabda;
+SET GLOBAL query_cache_type = 0;
 
+create trigger update_asistencias after UPDATE
+on player_stats for each row
+update player
+set asistencias=asistencias+new.assists-old.assists
+where player.player_id=player_id;
+
+
+create trigger update2_asistencias after insert
+on player_stats for each row
+update player 
+set asistencias=asistencias+new.assists
+where player.player_id=new.player_id ;
+
+
+create trigger update3_asistencias before delete
+on player_stats for each row
+update player
+set asistencias=asistencias-old.assists
+where player.player_id=old.player_id;
 ```
+
+Pruebas asociadas para el correcto funcionamiento de los triggers en ejercicio_5_PRUEBAS_TRIGGERS.sql cuyo contenido incluye:
+
+```SQL
+SELECT * FROM player;
+
+-- Comprobación UPDATE
+UPDATE player_stats
+SET assists = 8 
+WHERE game_id=2012020011 AND player_id=8448208;
+
+-- Deshacer UPDATE
+UPDATE player_stats
+SET assists = 2
+WHERE game_id=2012020011 AND player_id=8448208;
+
+-- Comprobación INSERT
+INSERT INTO player_stats(game_id,player_id,assists)
+VALUES (2012020001, 8448208, 188);
+
+-- Comprobación DELETE
+DELETE FROM player_stats WHERE game_id = 2012020001 AND player_id = 8448208 AND assists = 188;
+```
+
 
 #### f. Realizar la consulta 5.b sobre la base de datos desnormalizada. Estudiar coste y plan comparándolo con el obtenido en el apartado 5b.
 
-![Coste de la consulta con la base de datos desnormalizada]()
-    
-![Plan de consulta con la base de datos desnormalizada]()
-    
+```SQL
+-- Consulta tabla desnormalizada
+USE segundapracticabda;
+SET GLOBAL query_cache_type = 0;
+
+SELECT firstName, lastName, edad, goles, media_goles, asistencias, media_asistencias
+FROM player p
+WHERE edad BETWEEN '25' AND '33'
+GROUP BY firstName, lastName, edad, goles, media_goles;
+```
+
+El planificador escanea la tabla de jugador completa y posteriormente realiza el GROUP BY, el coste resultante es de 229.24 lo cual supone una mejora en el coste de 3 ordenes de magnitud. Por lo tanto desnormalizar la tabla en este caso, es muy eficiente para el planificador.
+
+![Coste de la consulta con la base de datos desnormalizada](capturas/5_f.png)
+
 ### 6. Particionamiento.
 
 #### a. Eliminar las claves foráneas con el script proporcionado “EliminarClavesForaneas.sql”.
@@ -288,8 +399,21 @@ En este apartado ejecutamos el script pertinente, sin más comentarios.
 #### b. Crear una consulta sql que obtenga, para cada jugador, su apellido, nombre, el número de partidos jugados y el número de jugadas realizadas por el jugador durante el año 2017. Estudiar coste y plan.
 
 ```SQL
+-- Consulta del punto 6.b
+USE segundapracticabda;
+SET GLOBAL query_cache_type = 0;
 
+SELECT p.firstName, p.lastName, COUNT(ps.player_id) AS partidosJugados, SUM(ps.puntuacion) as jugadasRealizadas
+FROM player p, player_stats ps , game g
+WHERE p.player_id = ps.player_id 
+AND g.game_id = ps.game_id
+AND YEAR(g.date_time) =2017
+GROUP BY p.player_id;
 ```
+
+Primero realiza un escaneo completo de la tabla game (g) a la cual hace join con player_stats (ps) y al resultado se le hace join con player donde se usan como índice las claves primarias. Por último se le aplica el group by y el resultado del query_block es 173779.07.
+
+![Coste de la consulta 6.b](capturas/6_b.png)
 
 #### c. Razonar justificadamente (sin necesidad de implementarla realmente en SQL) una variante de la estructura existente realizando un particionamiento horizontal de los datos con el objeto de mejorar el tipo de consultas (con diferentes años) que se ha realizado en el apartado 6.a
 
@@ -299,7 +423,7 @@ Por lo siguiente, nuestra propuesta consiste en hacer un particionamiento horizo
 
 #### d. Implementar en MySQL un particionamiento horizontal (mediante la sentencia ALTER TABLE …. PARTITION ….) que separe los datos de los partidos jugados en el año 2017 del resto. Realizar de nuevo la consulta 6.a y estudiar coste y plan comparándolo con lo obtenido en el apartado 6.a. Si se necesita modificar la clave primaria, hágase mediante la sentencia ALTER TABLE.
 
-Sigue la lógica anteriormente comentada, en este caso vamos a tener una tabla con los datos correspondientes a un solo año y por otro lado una tabla con el resto de años.
+Sigue la lógica anteriormente comentada, en este caso vamos a tener una tabla con los datos correspondientes a un solo año y por otro lado otras dos tablas con el resto de años. Para los anteriores a 2017 y los posteriores.
 
 Resulta que no podemos realizar particionamientos con MySQL en tablas que tengan claves foráneas, por lo que hay que ejecutar el script del punto 6.a (requisito ya cumplido) además tampoco podemos usar claves primarias. Eliminar esta clave sería una mala solución por lo que utilizamos una superclave conformada por game_id y date_time. De forma que podamos acceder a todas las tablas particionadas con clave.
 
@@ -312,19 +436,29 @@ ALTER TABLE game ADD PRIMARY KEY(game_id, date_time);
 ALTER TABLE game 
 PARTITION BY LIST (YEAR(date_time)) (
 	PARTITION part_2017 VALUES IN (2017),
-    PARTITION part_resto VALUES IN (2013, 2014, 2015, 2016, 2018)
+    PARTITION part_resto VALUES IN (2013, 2014, 2015, 2016),
+    PARTITION part_2018 VALUES IN (2018)
 );
 ```
 
 Realizamos ahora de nuevo la consulta 6.b, especificando su partición, y observamos las diferencias.
 ```SQL
--- Consulta en partición
+-- Consulta del punto 6.d
+USE segundapracticabda;
+SET GLOBAL query_cache_type = 0;
+
+SELECT p.firstName, p.lastName, COUNT(ps.player_id) AS partidosJugados, SUM(ps.puntuacion) as jugadasRealizadas
+FROM player p, player_stats ps , game PARTITION(part_2017)
+WHERE p.player_id = ps.player_id 
+AND game.game_id = ps.game_id
+GROUP BY p.player_id;
 
 ```
 
-![Coste con particionamiento]()
+Como vemos hace un escaneo completo de la partición de game (g) que es part_2017, el resto del plan es el mimso que sin partición. Sin embargo el coste es de 31097.86. Por lo tanto al realizar la partición la consulta sufre una mejora considerable.
 
-![Plan de ejecución con particionamiento]()
+![Coste con particionamiento](capturas/6_d.png)
+
 
 
 ## 3. Conclusiones
