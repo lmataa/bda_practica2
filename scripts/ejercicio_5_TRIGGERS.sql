@@ -1,3 +1,4 @@
+USE segundapracticabda;
 create trigger update_asistencias after update
 on player_stats for each row
 update player
