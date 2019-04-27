@@ -6,8 +6,8 @@ subtitle: "Segunda Práctica de Bases de Datos Avanzadas - UPM"
 logo: logo.png
 titlepage: "True"
 toc: "True"
-toc-own-page: "True"
 listings-no-page-break: "True"
+lof : "true"
 ...
 
 # Memoria de trabajo sobre técnicas de aceleración de consultas
@@ -144,7 +144,7 @@ HAVING numPartidos >= ALL(SELECT count(*) AS numPartidos
 
 El planificador utiliza las claves primarias para las tablas de team_stats (ts) y team (t) y realiza un escaneo completo de la tabla game (g). Posteriormente realiza en join de game con team_stats y el resultado con team. Por último le aplica la cláusula GROUP BY y resulta en un coste total de 4338.72 para esta consulta.
 
-![Plan y coste de la primera consulta](capturas/3_b_A.png)
+![Plan y coste de la consulta A](capturas/3_b_A.png)
 
 ```SQL
 -- Segunda consulta
@@ -164,7 +164,7 @@ HAVING numPartidos >= ALL(SELECT count(*) AS numPartidos
 
 En este caso el planificador realiza ahora un escaneo completo de la tabla de equipo (t), y utiliza las claves como índice en las otras tablas. Además la tabla de partidos (g) se ve afectada en coste por las funciones utilizadas. En este caso el join se realiza primero entre team y team_stats y el resultado con la tabla de partidos (g). Posteriormente realiza el GROUP BY y el query_block resultante tiene como coste 9353.92, lo cual es más costoso que la consulta anterior.
 
-![Plan y coste de la primera consulta](capturas/3_b_B.png)
+![Plan y coste de la consulta B](capturas/3_b_B.png)
 
 
 #### c. Crear los índices que permitan optimizar el coste de las consultas, analizando plan de consulta y coste para cada uno de los casos, justificando que solución es la más óptima.
@@ -192,25 +192,25 @@ ON team(team_id, teamName);
 
 Empezamos utilizando solo el índice indx_dtime, podemos apreciar que efectivamente se usa el índice en la tabla de partidos (g) y se recude bastante el coste tanto del escaneo de esta tabla como de la consulta global que pasa a ser de 1846.02.
 
-![Coste consulta A con índice indx_dtime](capturas/3_c_1.png)
+![Plan y coste consulta A con índice indx_dtime](capturas/3_c_1.png)
     
 Ahora eliminamos el índice de indx_dtime y probamos a realizar la misma consulta con el índice indx_team_id_name.
 
 No se produce ningún cambio respecto al plan sin la creación de este índice.
 
-![Coste consulta A con índice indx_team_id_name](capturas/3_c_2.png)
+![Plan y coste consulta A con índice indx_team_id_name](capturas/3_c_2.png)
 
 Probamos ahora a usar los dos índices en la primera consulta.
 
 Como podemos observar se obtiene el mismo coste en la tabla game que al usar solo indx_dtime pero a la hora del join con team_stats el coste aumenta debido al uso del índice indx_team_id_name. El coste resultante es de 2626.96, que es superior al de la consulta A con el índice indx_dtime. Por lo tanto para esta consulta lo más óptimo considerado es usar exclusivamente el índice indx_dtime.
     
-![Coste consulta A con ambos índices](capturas/3_c_3.png)
+![Plan y coste consulta A con ambos índices](capturas/3_c_3.png)
     
 - En cuanto a la segunda consulta propuesta:
 
 Como vemos, utiliza el índice en la tabla equipo (t) pero no reduce el coste final del query_block con respecto a la consulta sin índices. Sin embargo el peso de la consulta recae en examinar la tabla de equipo y quita peso al GROUP BY. Por eso el código de colores pinta ahora la cláusula GROUP BY en verde claro y la tabla team en rojo.
 
-![Coste de la consulta B con índice indx_team_id_name](capturas/3_c_4.png)
+![Plan y coste de la consulta B con índice indx_team_id_name](capturas/3_c_4.png)
  
 Como conclusión de este ejercicio, para realizar la consulta pedida de forma óptima, lo ideal es usar la primera consulta propuesta con el índice indx_dtime.
 
@@ -394,7 +394,7 @@ GROUP BY firstName, lastName, edad, goles, media_goles;
 
 El planificador escanea la tabla de jugador completa y posteriormente realiza el GROUP BY, el coste resultante es de 229.24 lo cual supone una mejora en el coste de 3 ordenes de magnitud. Por lo tanto desnormalizar la tabla en este caso, es muy eficiente para el planificador.
 
-![Coste de la consulta con la base de datos desnormalizada](capturas/5_f.png)
+![Plan y coste de la consulta 5.b con la base de datos desnormalizada](capturas/5_f.png)
 
 ### 6. Particionamiento.
 
@@ -419,7 +419,7 @@ GROUP BY p.player_id;
 
 Primero realiza un escaneo completo de la tabla game (g) a la cual hace join con player_stats (ps). Al resultado se le hace join con player (p) donde se usan como índice las claves primarias (al igual que en player_stats). Por último se le aplica el group by y el resultado del query_block es 173779.07.
 
-![Coste de la consulta 6.b](capturas/6_b.png)
+![Plan y coste de la consulta 6.b](capturas/6_b.png)
 
 #### c. Razonar justificadamente (sin necesidad de implementarla realmente en SQL) una variante de la estructura existente realizando un particionamiento horizontal de los datos con el objeto de mejorar el tipo de consultas (con diferentes años) que se ha realizado en el apartado 6.a
 
@@ -463,7 +463,7 @@ GROUP BY p.player_id;
 
 Como vemos hace un escaneo completo de la partición de game (g) que es part_2017, el resto del plan es el mimso que sin partición. Sin embargo el coste es de 31097.86. Por lo tanto al realizar la partición la consulta sufre una mejora considerable.
 
-![Coste con particionamiento](capturas/6_d.png)
+![Plan y coste de la consulta 6.b con particionamiento](capturas/6_d.png)
 
 
 
